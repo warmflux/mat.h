@@ -2,16 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
-typedef enum {
-    MAT_OK = 0,
-    MAT_ERR_SHAPE,
-    MAT_ERR_ALLOC,
-    MAT_ERR_NULL,
-    MAT_ERR_INVALID,
-    MAT_ERR_SINGULAR, // 表示矩阵奇异（不可逆 / 不满秩）
-    MAT_ERR_SIZE 
-} MatStatus;
+#include "mat.h"
 
 
 const char *mat_strerror(MatStatus st) {
@@ -27,11 +18,6 @@ const char *mat_strerror(MatStatus st) {
     return "unknown error";
 }
 
-
-typedef struct {
-    uint32_t row,col;
-    float *data;
-}Mat;
 
 void mat_print(Mat mat) {
     for (size_t i = 0; i < mat.row; ++i) {
@@ -118,7 +104,7 @@ MatStatus mat_ones(uint32_t row, uint32_t col, Mat *out) {
 }
 
 MatStatus mat_eye(uint32_t n, Mat *out) {
-    MatStatus st = mat_alloc_into(n, n, out);
+    MatStatus st = mat_zeros(n, n, out);
     if (st != MAT_OK) {
         return st;
     }
@@ -215,14 +201,10 @@ MatStatus mat_mul(Mat a, Mat b, Mat *c) {
     if (c == NULL) return MAT_ERR_NULL;
     if (!mat_valid(a) || !mat_valid(b)) return MAT_ERR_INVALID;
 
-    if (a.col != b.row) {
-        return MAT_ERR_SHAPE;
-    }
+    if (a.col != b.row) return MAT_ERR_SHAPE;
 
     float *new_data = mat_alloc(a.row, b.col);
-    if (new_data == NULL) {
-        return MAT_ERR_ALLOC;
-    }
+    if (new_data == NULL) return MAT_ERR_ALLOC;
 
     for (size_t i = 0; i < a.row; ++i) {
         for (size_t k = 0; k < a.col; ++k) {
@@ -235,6 +217,37 @@ MatStatus mat_mul(Mat a, Mat b, Mat *c) {
     mat_install(c, a.row, b.col, new_data);
     return MAT_OK;
 }
+
+
+MatStatus mat_fill(Mat *a, float v) {
+    if (a == NULL) return MAT_ERR_NULL;
+    if (!mat_valid(*a)) return MAT_ERR_INVALID;
+
+    size_t n = (size_t)a->row * a->col;
+    for (size_t i = 0; i < n; i++) {
+        a->data[i] = v;
+    }
+
+    return MAT_OK;
+}
+
+MatStatus mat_fill_new(uint32_t row, uint32_t col, float v, Mat *out) {
+    MatStatus st = mat_alloc_into(row, col, out);
+    if (st != MAT_OK) return st;
+
+    size_t n = (size_t) row * col;
+    for (size_t i = 0; i < n; ++i) {
+        out->data[i] = v;
+    }
+    return MAT_OK;
+
+}
+
+MatStatus mat_diag(uint32_t n, const float *v, Mat *out);
+MatStatus mat_get_diag(const Mat *a, Mat *out);
+MatStatus mat_copy(const Mat *a, Mat *out);
+
+
 
 void mat_free(Mat *mat) {
     if (mat == NULL) return;
